@@ -4,6 +4,8 @@ import edu.touro.mcon364.finalreview.model.LogLevel;
 import edu.touro.mcon364.finalreview.model.LogMessage;
 
 import java.util.Map;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * LogProcessor.
@@ -62,11 +64,23 @@ public class LogProcessor {
      * - count by log level
      */
 
+    private final BlockingQueue<LogMessage> queue = new LinkedBlockingQueue<>();
+    private ExecutorService executor;
+    private final AtomicInteger totalProcessed = new AtomicInteger(0);
+    private final ConcurrentHashMap<LogLevel, Integer> countsByLevel = new ConcurrentHashMap<>();
+    private volatile boolean running = false;
+
+
     /**
      * Accept one message for processing.
      */
     public void submit(LogMessage message) {
         // TODO: implement
+        if (!running) {
+            throw new IllegalStateException("LogProcessor is not running");
+        }
+
+        queue.offer(message);
     }
 
     /**
@@ -74,6 +88,15 @@ public class LogProcessor {
      */
     public void start(int workerCount) {
         // TODO: implement
+        if (workerCount <= 0) {
+            throw new IllegalStateException("workerCount must be greater than 0");
+        }
+
+        running = true;
+        executor = Executors.newFixedThreadPool(workerCount);
+        for (int i = 0; i < workerCount; i++) {
+            executor.submit(this::workerLoop);
+        }
     }
 
     /**
@@ -84,6 +107,13 @@ public class LogProcessor {
      */
     private void workerLoop() {
         // TODO: implement
+        try {
+            while (running || !queue.isEmpty()) {
+                process(queue.take());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
@@ -91,6 +121,8 @@ public class LogProcessor {
      */
     private void process(LogMessage message) {
         // TODO: implement
+        totalProcessed.incrementAndGet();
+        countsByLevel.merge(message.level(), 1, Integer::sum);
     }
 
     /**
@@ -98,6 +130,19 @@ public class LogProcessor {
      */
     public void stop() throws InterruptedException {
         // TODO: implement
+        running = false;
+
+        if (executor == null) {
+            return;
+        }
+
+        executor.shutdownNow();
+        executor.awaitTermination(1, TimeUnit.SECONDS);
+
+        LogMessage msg;
+        while((msg = queue.poll()) != null) {
+            process(msg);
+        }
     }
 
     /**
@@ -105,7 +150,7 @@ public class LogProcessor {
      */
     public int getTotalProcessed() {
         // TODO: implement
-        return 0;
+        return totalProcessed.get();
     }
 
     /**
@@ -113,6 +158,6 @@ public class LogProcessor {
      */
     public Map<LogLevel, Integer> getCountsByLevel() {
         // TODO: implement
-        return Map.of();
+        return Map.copyOf(countsByLevel);
     }
 }
