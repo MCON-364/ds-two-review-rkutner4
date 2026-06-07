@@ -3,6 +3,9 @@ package edu.touro.mcon364.finalreview.orderflowhandoff.homework;
 import edu.touro.mcon364.finalreview.model.SensorReading;
 
 import java.util.DoubleSummaryStatistics;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Homework 2 — Sensor reading processor.
@@ -42,6 +45,11 @@ import java.util.DoubleSummaryStatistics;
  * - If several workers update the same stats, how will those updates stay correct?
  */
 public class SensorProcessor {
+    private final BlockingQueue<SensorReading> readings = new LinkedBlockingQueue<>();
+    private ExecutorService executor;
+    private volatile boolean running = true;
+    private AtomicInteger totalProcessed = new AtomicInteger(0);
+    private final AtomicReference <DoubleSummaryStatistics> stats = new AtomicReference<>(new DoubleSummaryStatistics());
 
     /**
      * Accept one sensor reading for processing.
@@ -50,6 +58,9 @@ public class SensorProcessor {
      */
     public void submit(SensorReading reading) {
         // TODO: decide where submitted readings should be stored
+        if (running) {
+            readings.offer(reading);
+        }
     }
 
     /**
@@ -61,6 +72,26 @@ public class SensorProcessor {
     public void start(int workerCount) {
         // TODO: validate workerCount
         // TODO: start the requested number of workers
+        if (workerCount <= 0) {
+            throw new IllegalArgumentException("workerCount must be greater than 0");
+        }
+        executor = Executors.newFixedThreadPool(workerCount);
+        for (int i = 0; i < workerCount; i++) {
+            executor.submit(this::workerLoop);
+        }
+    }
+
+    // Update the total processed count
+    // Combine the existing stats with the new reading
+    // Update the stats with the new reading value
+    private void process(SensorReading reading) {
+        totalProcessed.incrementAndGet();
+        stats.updateAndGet(existing -> {
+            DoubleSummaryStatistics updated = new DoubleSummaryStatistics();
+            updated.combine(existing);
+            updated.accept(reading.value());
+            return updated;
+        });
     }
 
     /**
@@ -72,6 +103,16 @@ public class SensorProcessor {
      */
     private void workerLoop() {
         // TODO: implement the worker behavior
+        while (running || !readings.isEmpty()) {
+            try {
+                SensorReading reading =  readings.poll(100, TimeUnit.MILLISECONDS);
+                if (reading != null) {
+                    process(reading);
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -82,6 +123,18 @@ public class SensorProcessor {
     public void stop() throws InterruptedException {
         // TODO: signal that work should stop
         // TODO: wait for all workers to finish
+        running = false;
+        if (executor != null) {
+            executor.shutdown();
+            executor.awaitTermination (
+                    Long.MAX_VALUE,
+                    TimeUnit.NANOSECONDS
+            );
+        }
+
+        while(!readings.isEmpty()) {
+            process(readings.poll());
+        }
     }
 
     /**
@@ -89,7 +142,7 @@ public class SensorProcessor {
      */
     public int getTotalProcessed() {
         // TODO: return the processed count safely
-        return 0;
+        return totalProcessed.get();
     }
 
     /**
@@ -100,6 +153,8 @@ public class SensorProcessor {
      */
     public DoubleSummaryStatistics getStats() {
         // TODO: calculate or return the current statistics safely
-        return new DoubleSummaryStatistics();
+        DoubleSummaryStatistics result = new DoubleSummaryStatistics();
+        result.combine(stats.get());
+        return result;
     }
 }
