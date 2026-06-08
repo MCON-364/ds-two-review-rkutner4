@@ -44,7 +44,12 @@ public class EmployeeRoster {
 
     public EmployeeRoster(List<Employee> employees) {
         // TODO: validate non-null, store a defensive copy
-        this.employees = List.of();
+        this.employees =
+                List.copyOf(
+                        Objects.requireNonNull(
+                                employees,
+                                "employees must not be null")
+                );
     }
 
     /**
@@ -54,7 +59,15 @@ public class EmployeeRoster {
      */
     public TreeMap<String, TreeSet<Employee>> buildRoster() {
         // TODO
-        return new TreeMap<>();
+        return employees.stream()
+                .collect(Collectors.groupingBy(Employee::department,
+                        TreeMap::new,
+                        Collectors.toCollection(
+                                () -> new TreeSet<>(
+                                        Comparator.comparing(Employee::name)
+                                )
+                        )
+                ));
     }
 
     /**
@@ -64,7 +77,17 @@ public class EmployeeRoster {
      */
     public Map<String, Employee> getTopEarnerPerDepartment() {
         // TODO
-        return Map.of();
+        return employees.stream()
+                .collect(Collectors.groupingBy(
+                        Employee::department,
+                        Collectors.collectingAndThen(
+                                Collectors.maxBy(
+                                        Comparator
+                                                .comparingDouble(Employee::salary)
+                                ),
+                                Optional::orElseThrow
+                        )
+                ));
     }
 
     /**
@@ -75,7 +98,10 @@ public class EmployeeRoster {
      */
     public List<Employee> getAllEmployeesSorted() {
         // TODO
-        return List.of();
+        return employees.stream()
+                .sorted(Comparator.comparing(Employee::name)
+                        .thenComparing(Employee::salary))
+                .toList();
     }
 
     /**
@@ -88,7 +114,7 @@ public class EmployeeRoster {
      */
     public NavigableMap<String, TreeSet<Employee>> getDepartmentsInRange(String from, String to) {
         // TODO
-        return new TreeMap<>();
+        return buildRoster().subMap(from, true, to, true);
     }
 }
 
