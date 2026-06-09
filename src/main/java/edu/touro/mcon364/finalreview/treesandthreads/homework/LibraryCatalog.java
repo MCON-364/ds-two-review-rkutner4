@@ -36,7 +36,11 @@ public class LibraryCatalog {
 
     public LibraryCatalog(List<Book> books) {
         // TODO: validate non-null, store a defensive copy
-        this.books = List.of();
+        this.books = List.copyOf(
+                Objects.requireNonNull(
+                        books,
+                        "books cannot be null")
+        );
     }
 
     /**
@@ -46,7 +50,13 @@ public class LibraryCatalog {
      */
     public TreeMap<String, Book> buildTitleIndex() {
         // TODO
-        return new TreeMap<>();
+        return books.stream()
+                .collect(Collectors.toMap(
+                        Book::title,
+                        book -> book,
+                        (existing, replacement) -> existing,
+                        TreeMap::new
+                ));
     }
 
     /**
@@ -55,7 +65,12 @@ public class LibraryCatalog {
      */
     public TreeMap<String, TreeSet<Book>> buildAuthorIndex() {
         // TODO
-        return new TreeMap<>();
+        return books.stream()
+                .collect(Collectors.groupingBy(
+                        Book::author,
+                        TreeMap::new,
+                        Collectors.toCollection(()->new TreeSet<>(Comparator.comparing(Book::title)))
+                ));
     }
 
     /**
@@ -64,7 +79,16 @@ public class LibraryCatalog {
      */
     public List<Book> getBooksPublishedBefore(int year) {
         // TODO
-        return List.of();
+        return books.stream()
+                .filter(book -> book.year() < year)
+                .sorted(Comparator.comparing(Book::title))
+                .toList();
+//        return books.stream()
+//                .filter(book -> book.year() < year)
+//                .collect(Collectors.toCollection(
+//                        () -> new TreeSet<>(Comparator.comparing(Book::title))
+//                ))
+//                .stream().toList();
     }
 
     /**
