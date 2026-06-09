@@ -96,8 +96,13 @@ public class LibraryCatalog {
      *
      */
     public List<String> getAuthorsWithMoreThan(int n) {
-        // TODO
-        return List.of();
+        return books.stream().
+                //create a map of authors to the number of books
+                        collect(Collectors.groupingBy(Book::author, TreeMap::new, Collectors.counting())).
+                //filter entries by the number of books > n
+                        entrySet().stream().filter(entry -> entry.getValue() > n).
+                //convert to authors. It's already sorted because we have a TreeMap
+                        map(entry -> entry.getKey()).toList();
     }
 
     /**
@@ -106,7 +111,12 @@ public class LibraryCatalog {
      */
     public List<Book> findByTitlePrefix(String prefix) {
         // TODO
-        return List.of();
+        NavigableMap<String, Book> titleIndex = buildTitleIndex();
+        String fromKey = prefix;
+        // To get the next string after the prefix, we can append a character that is just after the last character of the prefix in the ASCII table.
+        // For example, if the prefix is "The", we can use "The" + Character.MAX_VALUE to ensure we get all titles starting with "The".
+        String toKey = prefix + Character.MAX_VALUE;
+        return titleIndex.subMap(fromKey, true, toKey, false).values().stream().toList();
     }
 }
 
