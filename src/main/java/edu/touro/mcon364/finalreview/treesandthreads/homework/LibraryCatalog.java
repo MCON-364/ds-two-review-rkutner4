@@ -83,12 +83,6 @@ public class LibraryCatalog {
                 .filter(book -> book.year() < year)
                 .sorted(Comparator.comparing(Book::title))
                 .toList();
-//        return books.stream()
-//                .filter(book -> book.year() < year)
-//                .collect(Collectors.toCollection(
-//                        () -> new TreeSet<>(Comparator.comparing(Book::title))
-//                ))
-//                .stream().toList();
     }
 
     /**
@@ -97,7 +91,15 @@ public class LibraryCatalog {
      */
     public List<String> getAuthorsWithMoreThan(int n) {
         // TODO
-        return List.of();
+        return books.stream()
+                .collect(Collectors.groupingBy(
+                        Book::author,
+                        TreeMap::new,
+                        Collectors.counting())).
+                entrySet().stream()
+                .filter(entry -> entry.getValue() > n)
+                .map(entry -> entry.getKey())
+                .toList();
     }
 
     /**
@@ -106,7 +108,10 @@ public class LibraryCatalog {
      */
     public List<Book> findByTitlePrefix(String prefix) {
         // TODO
-        return List.of();
+        NavigableMap<String, Book> titleIndex = this.buildTitleIndex();
+        String from = prefix;
+        String to = prefix + Character.MAX_VALUE;
+        return titleIndex.subMap(from, true, to, false).values().stream().toList();
     }
 }
 
